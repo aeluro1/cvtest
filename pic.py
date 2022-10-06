@@ -10,8 +10,11 @@ def main():
         print("Unable to load picture")
         exit()
 
-    frame = cv.cvtColor(cap, cv.COLOR_BGR2GRAY)
+
     frame = ip.resizeImg(frame, width = 500)
+
+    frame = cv.cvtColor(cap, cv.COLOR_BGR2GRAY)
+    frame = cv.GaussianBlur(frame, (5, 5), 0)
 
     cv.imshow("View", frame)
 
