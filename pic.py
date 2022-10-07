@@ -24,26 +24,28 @@ def main():
     frame = ip.resizeImg(frame, width = 500)
 
     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-    frame = cv.GaussianBlur(frame, (11, 11), 0)
-    #frame = cv.medianBlur(frame, 5)
+    #frame = cv.GaussianBlur(frame, (11, 11), 0)
+    frame = cv.medianBlur(frame, 5)
 
-    otsu_thresh, frame = cv.threshold(frame, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+##    ret, frame = cv.threshold(frame, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    frame = cv.adaptiveThreshold(frame, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 3, 2)
 
     # Morphological open to isolate/denoise elliptical features
-    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5,5))
-    opening = cv.morphologyEx(frame, cv.MORPH_OPEN, kernel, iterations = 3)
-
-    # Find contours
+##    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5,5))
+##    frame = cv.morphologyEx(frame, cv.MORPH_OPEN, kernel, iterations = 3)
+##
+##    # Find contours
     cnts = cv.findContours(frame, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
     cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+    frame = cv.cvtColor(frame, cv.COLOR_GRAY2BGR) # for testing to show red circles
     for c in cnts:
         pm = cv.arcLength(c, True)
         approx = cv.approxPolyDP(c, 0.04 * pm, True)
         area = cv.contourArea(c)
         if len(approx) > 5 and area > 1000 and area < 500000:
             ((x, y), r) = cv.minEnclosingCircle(c)
-            cv.circle(frame, (int(x), int(y)), int(r), (36, 255, 12), 2)
-    
+            cv.circle(frame, (int(x), int(y)), int(r), (0, 0, 255), 2)
+
     cv.imshow("View", frame)
 
     if cv.waitKey(0) == ord('s'):
