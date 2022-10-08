@@ -5,19 +5,14 @@ import imgprocess as ip
 import time
 import os
 import argparse
+srcpath = "flanges"
 outpath = "temp"
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-i", "--image", type = str, required = True, help = "Image index")
 args = vars(ap.parse_args())
-##import sys
-##
-##if len(sys.argv) > 1:
-##    srcpath =os.path.join("flanges", f"{sys.argv[1]}.jpg")
-##else:
-##    sys.exit("No image index provided")
 
-srcpath = os.path.join("flanges", f"{args['image']}.jpg")
+srcpath = os.path.join(srcpath, f"{args['image']}.jpg")
 
 def main():
     cap = cv.imread(srcpath)
@@ -33,19 +28,22 @@ def main():
     original = frame
     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
 ##    frame = cv.GaussianBlur(frame, (5, 5), 0) # Review effect
-    frame = cv.medianBlur(frame, 5)
+    frame = cv.medianBlur(frame, 3)
 
-    #(T, thresh) = cv.threshold(frame, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU)
-    frame = cv.adaptiveThreshold(frame, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 3, 2)
-    frame = cv.bitwise_not(frame)
+##    frame = cv.bilateralFilter(frame, 5, 175, 175)
+    frame = cv.Canny(frame, 75, 100)
 
-    contours, h = cv.findContours(frame, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
+    contours, h = cv.findContours(frame, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+    circles = []
     for c in contours:
-        print(len(c))
-        print(c.shape)
-        approx = cv.approxPolyDP(c, 0.03 * cv.arcLength(c, True), True)
-        if len(c) > 10 and cv.isContourConvex(approx):
-            cv.drawContours(original, [c], 0, (0, 0, 255), -1)
+        approx = cv.approxPolyDP(c, 0.05 * cv.arcLength(c, True), True)
+##        if ((len(approx) > 8) and (cv.isContourConvex(approx)) and (area > 3)):
+##            circles.append(c);
+        circles.append(c);
+            
+##            cv.imshow(original)
+##            cv.waitKey(0)
+    cv.drawContours(original, circles, -1, (0, 0, 255), -1)
             
 ##    # Morphological open to remove black noise blobs
 ##    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (3,3))
@@ -64,11 +62,12 @@ def main():
 ##            cv.circle(frame, (int(x), int(y)), int(r), (0, 0, 255), 2)
 
     frame = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
-    cv.imshow("View", frame)
-    cv.imshow("Circled", original)
+    
+    frame = cv.hconcat((frame, original))
+    cv.imshow("Results", frame)
+    
     if cv.waitKey(0) == ord('s'):
         t = time.strftime("%Y%m%d-%H%M%S")
-        frame = cv.hconcat((frame, original))
         cv.imwrite(os.path.join(outpath, f"test_{t}.png"), frame)
 
     cv.destroyAllWindows()
