@@ -14,6 +14,11 @@ args = vars(ap.parse_args())
 
 srcpath = os.path.join(srcpath, f"{args['image']}.jpg")
 
+class Init:
+    def __init__(self, init_: bool):
+        self.init = init_
+_init = Init(False)
+
 def main():
     cap = cv.imread(srcpath)
 
