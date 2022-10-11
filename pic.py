@@ -31,10 +31,10 @@ def canny_calc(img, s = 0.33):
 def find_contour(img):
     contours, h = cv.findContours(img, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
     circles = []
-    for c in contours:
+    for c in contours: 
         approx = cv.approxPolyDP(c, 0.02 * cv.arcLength(c, True), False) # Closed contour boolean set to false as many holes are open; (cv.isContourConvex(approx)) and (area > 3) also removed
-        if (True):#(len(approx) > 8)
-            circles.append(c);
+        if (len(approx) > 8):
+            circles.append(c)
     return circles
 
 def find_hCircle(img):
@@ -60,6 +60,7 @@ def main():
     original = frame.copy()
     
     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    
     frame = cv.medianBlur(frame, BLUR_KERNEL_SIZE)
     
     (lower, upper) = canny_calc(frame)
