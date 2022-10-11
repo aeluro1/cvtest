@@ -8,7 +8,10 @@ import argparse
 SRCPATH = "flanges"
 OUTPATH = "temp"
 
-BLUR_KERNEL_SIZE = 5
+BLUR_KERNEL_SIZE = 9
+ACCUMULATOR_RATIO = 1 # Ratio of image resolution to accumulator resolution; bigger = rougher circles detectable
+ACCUMULATOR_THRESH = 50 # Higher = more likely to be true circle
+CIRCLE_GAP = 30
 
 # Calculate Canny parameters based on median intensity of filtered image
 # https://stackoverflow.com/questions/41893029/opencv-canny-edge-detection-not-working-properly
@@ -39,10 +42,34 @@ def find_contour(img):
 
 def find_hCircle(img):
     (lower, upper) = canny_calc(img)
-    circles = cv.HoughCircles(img, cv.HOUGH_GRADIENT, 1, 20, param1 = upper, param2 = 75, minRadius = 0, maxRadius = 0)
+    circles = cv.HoughCircles(img, cv.HOUGH_GRADIENT, ACCUMULATOR_RATIO, CIRCLE_GAP, param2 = ACCUMULATOR_THRESH, minRadius = 5, maxRadius = 500)
     if circles is not None:
         circles = np.uint16(np.around(circles))
     return circles
+
+def draw_contour(frame, contours):
+    img_cnt = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
+    if contours is None:
+        return img_cnt
+
+    for c in contours:
+        img_cnt = cv.drawContours(img_cnt, c, 0, (0, 0, 255), -1)
+        (x, y), r = cv.minEnclosingCircle(c)
+        center = (int(x),int(y))
+        r = int(r)
+        cv.circle(img_cnt, center, r, (0, 255, 0), 2)
+    return img_cnt
+
+def draw_hCircle(frame, hCircles):
+    img_hough = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
+    if hCircles is None:
+        return img_hough
+    for i in hCircles[0, :]: # Unpacks 1xNx3 array into Nx3 array
+        center = (i[0], i[1])
+        cv.circle(img_hough, center, 1, (0, 0, 255), 3)
+        radius = i[2]
+        cv.circle(img_hough, center, radius, (0, 0, 255), 3)
+    return img_hough
 
 def main():
     ap = argparse.ArgumentParser()
@@ -67,18 +94,13 @@ def main():
     frame = cv.Canny(frame, lower, upper)
 
     contours = find_contour(frame)
-    img_cnt = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
-    img_cnt = cv.drawContours(img_cnt, contours, -1, (0, 0, 255), -1)
+    img_cnt = draw_contour(frame, contours)
 
     hCircles = find_hCircle(frame)
-    img_hough = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
-
-    for i in hCircles[0, :]: # Unpacks 1xNx3 array into Nx3 array
-        center = (i[0], i[1])
-        cv.circle(img_hough, center, 1, (0, 0, 255), 3)
-        
-        radius = i[2]
-        cv.circle(img_hough, center, radius, (0, 0, 255), 3)
+    if hCircles is not None:
+        circlist = sorted(hCircles[0], key = lambda circ: circ[2], reverse = True)
+        print(circlist)
+    img_hough = draw_hCircle(frame, hCircles)    
     
     frame = cv.hconcat((original, img_hough, img_cnt))
     cv.imshow("Results", frame)
@@ -91,3 +113,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def crop(img):
+    return
