@@ -15,7 +15,7 @@ CIRCLE_GAP = 30
 
 # Calculate Canny parameters based on median intensity of filtered image
 # https://stackoverflow.com/questions/41893029/opencv-canny-edge-detection-not-working-properly
-def canny_calc(img, s = 0.33):
+def canny_calc(img, s = 0.5):
     v = np.median(img)
     if v > 191: # light images
         th1 = int(max(0, (1.0 - 2 * s) * (255 - v)))
@@ -33,11 +33,13 @@ def canny_calc(img, s = 0.33):
 
 def find_contour(img):
     contours, h = cv.findContours(img, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+    
     circles = []
     for c in contours: 
         approx = cv.approxPolyDP(c, 0.02 * cv.arcLength(c, True), False) # Closed contour boolean set to false as many holes are open; (cv.isContourConvex(approx)) and (area > 3) also removed
         if (len(approx) > 8):
-            circles.append(c)
+            circles.append(cv.fitEllipse(c))
+    circles = sorted(circles, key = lambda rect: rect[1][0] * rect[1][1], reverse = True)
     return circles
 
 def find_hCircle(img):
@@ -53,11 +55,7 @@ def draw_contour(frame, contours):
         return img_cnt
 
     for c in contours:
-        img_cnt = cv.drawContours(img_cnt, c, 0, (0, 0, 255), -1)
-        (x, y), r = cv.minEnclosingCircle(c)
-        center = (int(x),int(y))
-        r = int(r)
-        cv.circle(img_cnt, center, r, (0, 255, 0), 2)
+        cv.ellipse(img_cnt, c, (0, 0, 255), 2)
     return img_cnt
 
 def draw_hCircle(frame, hCircles):
@@ -70,6 +68,13 @@ def draw_hCircle(frame, hCircles):
         radius = i[2]
         cv.circle(img_hough, center, radius, (0, 0, 255), 3)
     return img_hough
+
+def crop(img, shapes):
+    maxx = shapes[0]
+    #rect = cv.boundingRect(maxx)
+    (cx, cy) = maxx[1] # Unpacks 2-element tuple
+    print(maxx)
+    return
 
 def main():
     ap = argparse.ArgumentParser()
@@ -95,15 +100,21 @@ def main():
 
     contours = find_contour(frame)
     img_cnt = draw_contour(frame, contours)
+    crop(img_cnt, contours)
 
     hCircles = find_hCircle(frame)
-    if hCircles is not None:
-        circlist = sorted(hCircles[0], key = lambda circ: circ[2], reverse = True)
-        print(circlist)
+    
     img_hough = draw_hCircle(frame, hCircles)    
+
+
+    cv.putText(original, "Original", (25, 25), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv.putText(img_hough, "Hough Image", (25, 25), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv.putText(img_cnt, "Contoured Image", (25, 25), cv.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
     
     frame = cv.hconcat((original, img_hough, img_cnt))
     cv.imshow("Results", frame)
+
     
     if cv.waitKey(0) == ord('s'):
         t = time.strftime("%Y%m%d-%H%M%S")
@@ -114,5 +125,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-def crop(img):
-    return
