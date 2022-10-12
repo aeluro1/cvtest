@@ -12,4 +12,4 @@ def resizeImg(image, width = None, height = None, inter = cv.INTER_AREA):
     else:
         r = width / float(w)
         dim = (width, int(h * r))
-    return cv.resize(image, dim, interpolation = inter)
+    return (cv.resize(image, dim, interpolation = inter), dim)

@@ -71,6 +71,8 @@ def draw_hCircle(frame, hCircles):
 
 def crop(img, shapes):
     maxx = shapes[0]
+    mask = np.zeros((img.shape[0], img.shape[1]))
+    cv.ellipse(mask, maxx, 1, thickness = -1)
     #rect = cv.boundingRect(maxx)
     (cx, cy) = maxx[1] # Unpacks 2-element tuple
     print(maxx)
@@ -87,7 +89,7 @@ def main():
         print("Unable to load picture")
         exit()
 
-    frame = ip.resizeImg(frame, width = 500)
+    #frame = ip.resizeImg(frame, width = 500)
 
     original = frame.copy()
     
@@ -113,8 +115,10 @@ def main():
 
     
     frame = cv.hconcat((original, img_hough, img_cnt))
-    cv.imshow("Results", frame)
 
+    cv.namedWindow("Results", cv.WINDOW_NORMAL)
+    cv.resizeWindow("Results", (x / 3 for x in frame.shape[0:2]))
+    cv.imshow("Results", frame)
     
     if cv.waitKey(0) == ord('s'):
         t = time.strftime("%Y%m%d-%H%M%S")
