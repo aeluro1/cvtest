@@ -13,9 +13,9 @@ FONT_SIZE = 10
 FONT_THICK = 20
 
 # PROCESSING PARAMETERS
-BLUR_KERNEL_SIZE = 11
-MORPH_KERNEL_SIZE = (3, 3)
-MORPH_PASSES = 3
+BLUR_KERNEL_SIZE = 9
+MORPH_KERNEL_SIZE = (1, 1)
+MORPH_PASSES = 1
 
 # HOUGH CIRCLE PARAMETERS
 ACCUMULATOR_RATIO = 1 # Ratio of image resolution to accumulator resolution; bigger = rougher circles detectable
@@ -78,7 +78,9 @@ def draw_hCircle(frame, hCircles):
         cv.circle(img_hough, center, radius, (0, 0, 255), 3)
     return img_hough
 
-def crop(img, shapes):
+def crop(img, shapes): # This section needs fixing
+    if shapes is None:
+        return
     maxx = shapes[0]
     mask = np.ones((img.shape[0], img.shape[1]))
     cv.ellipse(mask, maxx, 1, thickness = -1)
@@ -100,27 +102,32 @@ def main():
         print("Unable to load picture")
         exit()
 
-##    frame = ip.resizeImg(frame, width = 500)
+    # Blur before resizing to reduce artifacts - need to implement
+    frame = ip.resizeImg(frame, width = 500)[0]
 
     original = frame.copy()
     
     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     
     frame = cv.medianBlur(frame, BLUR_KERNEL_SIZE)
-
-    ker = cv.getStructuringElement(cv.MORPH_ELLIPSE, MORPH_KERNEL_SIZE)
-    frame = cv.morphologyEx(frame, cv.MORPH_OPEN, ker, MORPH_PASSES)
-    img_processed = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
+    # frame = cv.GaussianBlur(frame, (BLUR_KERNEL_SIZE,) * 2, 0)
     
+
     (lower, upper) = canny_calc(frame)
     frame = cv.Canny(frame, lower, upper)
 
+
+    img_processed = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
+
+    ker = cv.getStructuringElement(cv.MORPH_ELLIPSE, MORPH_KERNEL_SIZE) # Morph functions aren't so useful for hollow objects
+    frame = cv.morphologyEx(frame, cv.MORPH_OPEN, ker, MORPH_PASSES)
+
     contours = find_contour(frame)
     img_cnt = draw_contour(frame, contours)
-    crop(img_cnt, contours)
+    # crop(img_cnt, contours)
 
-##    hCircles = find_hCircle(frame)
-##    img_hough = draw_hCircle(frame, hCircles)
+    hCircles = find_hCircle(frame)
+    img_hough = draw_hCircle(frame, hCircles)
     
     frame = cv.hconcat((original, img_processed, img_cnt))
 
