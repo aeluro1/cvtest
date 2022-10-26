@@ -8,19 +8,16 @@ import argparse
 # GENERAL PARAMETERS
 SRCPATH = "flanges"
 OUTPATH = "temp"
-WINDOW_SCALE = 1/8
-FONT_SIZE = 10
-FONT_THICK = 20
+WINDOW_SCALE = 1
 
 # PROCESSING PARAMETERS
-BLUR_KERNEL_SIZE = 9
+RESIZE_WIDTH = 500
+BLUR_KERNEL_SIZE = 21
 MORPH_KERNEL_SIZE = (1, 1)
 MORPH_PASSES = 1
 
-# HOUGH CIRCLE PARAMETERS
-ACCUMULATOR_RATIO = 1 # Ratio of image resolution to accumulator resolution; bigger = rougher circles detectable
-ACCUMULATOR_THRESH = 50 # Higher = more likely to be true circle
-CIRCLE_GAP = 30
+FONT_SCALE = RESIZE_WIDTH / 1000
+FONT_THICK = 1
 
 # Calculate Canny parameters based on median intensity of filtered image
 # https://stackoverflow.com/questions/41893029/opencv-canny-edge-detection-not-working-properly
@@ -43,19 +40,12 @@ def canny_calc(img, s = 0.33):
 def find_contour(img):
     contours, h = cv.findContours(img, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
     
-    circles = []
+    ellipses = []
     for c in contours: 
         approx = cv.approxPolyDP(c, 0.02 * cv.arcLength(c, True), False) # Closed contour boolean set to false as many holes are open; (cv.isContourConvex(approx)) and (area > 3) also removed
         if (len(approx) > 8):
-            circles.append(cv.fitEllipse(c))
-    circles = sorted(circles, key = lambda rect: rect[1][0] * rect[1][1], reverse = True)
-    return circles
-
-def find_hCircle(img):
-    (lower, upper) = canny_calc(img)
-    circles = cv.HoughCircles(img, cv.HOUGH_GRADIENT, ACCUMULATOR_RATIO, CIRCLE_GAP, param2 = ACCUMULATOR_THRESH, minRadius = 5, maxRadius = 500)
-    if circles is not None:
-        circles = np.uint16(np.around(circles))
+            ellipses.append(cv.fitEllipse(c))
+    circles = sorted(ellipses, key = lambda rect: rect[1][0] * rect[1][1], reverse = True)
     return circles
 
 def draw_contour(frame, contours):
@@ -64,19 +54,21 @@ def draw_contour(frame, contours):
         return img_cnt
 
     for c in contours:
-        cv.ellipse(img_cnt, c, (0, 0, 255), 10)
+        cv.ellipse(img_cnt, c, (0, 0, 255), 2)
     return img_cnt
-
-def draw_hCircle(frame, hCircles):
-    img_hough = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
-    if hCircles is None:
-        return img_hough
-    for i in hCircles[0, :]: # Unpacks 1xNx3 array into Nx3 array
-        center = (i[0], i[1])
-        cv.circle(img_hough, center, 1, (0, 0, 255), 3)
-        radius = i[2]
-        cv.circle(img_hough, center, radius, (0, 0, 255), 3)
-    return img_hough
+    
+def filter_results(contours):
+    maxdim = max(contours[0][1])
+    print(maxdim)
+    (cx, cy) = contours[0][0]
+    hbound = (cx - maxdim, cx + maxdim)
+    vbound = (cy - maxdim, cy+ maxdim)
+    print(hbound)
+    print(vbound)
+    for cnt in contours:
+        if hbound[0] < cnt[0][0] < hbound[1] and vbound[0] < cnt[0][1] < vbound[1]:
+            contours.remove(cnt)
+    return contours
 
 def crop(img, shapes): # This section needs fixing
     if shapes is None:
@@ -102,39 +94,38 @@ def main():
         print("Unable to load picture")
         exit()
 
-    # Blur before resizing to reduce artifacts - need to implement
-    frame = ip.resizeImg(frame, width = 500)[0]
+    frame = cv.medianBlur(frame, BLUR_KERNEL_SIZE)
+    # frame = cv.GaussianBlur(frame, (BLUR_KERNEL_SIZE,) * 2, 0)
+    
+    frame = ip.resizeImg(frame, width = RESIZE_WIDTH)[0]
+    print(frame.shape)
 
     original = frame.copy()
     
     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     
-    frame = cv.medianBlur(frame, BLUR_KERNEL_SIZE)
-    # frame = cv.GaussianBlur(frame, (BLUR_KERNEL_SIZE,) * 2, 0)
-    
-
     (lower, upper) = canny_calc(frame)
     frame = cv.Canny(frame, lower, upper)
 
 
     img_processed = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
 
-    ker = cv.getStructuringElement(cv.MORPH_ELLIPSE, MORPH_KERNEL_SIZE) # Morph functions aren't so useful for hollow objects
-    frame = cv.morphologyEx(frame, cv.MORPH_OPEN, ker, MORPH_PASSES)
+    # ker = cv.getStructuringElement(cv.MORPH_ELLIPSE, MORPH_KERNEL_SIZE) # Morph functions aren't so useful for hollow objects
+    # frame = cv.morphologyEx(frame, cv.MORPH_OPEN, ker, MORPH_PASSES)
 
     contours = find_contour(frame)
+    print(len(contours))
+    contours = filter_results(contours)
+    print(len(contours))
     img_cnt = draw_contour(frame, contours)
     # crop(img_cnt, contours)
-
-    hCircles = find_hCircle(frame)
-    img_hough = draw_hCircle(frame, hCircles)
     
     frame = cv.hconcat((original, img_processed, img_cnt))
 
     labels = ("Original", "Processed", "Contoured")
     for (i, txt) in enumerate(labels):
-        sz = cv.getTextSize(txt, cv.FONT_HERSHEY_SIMPLEX, FONT_SIZE, FONT_THICK)
-        cv.putText(frame, txt, (original.shape[1] * i, original.shape[0] - sz[1]), cv.FONT_HERSHEY_SIMPLEX, FONT_SIZE, (0, 255, 0), FONT_THICK)
+        sz = cv.getTextSize(txt, cv.FONT_HERSHEY_SIMPLEX, FONT_SCALE, thickness = FONT_THICK)
+        cv.putText(frame, txt, (original.shape[1] * i, original.shape[0] - sz[1]), cv.FONT_HERSHEY_SIMPLEX, FONT_SCALE, (0, 255, 0), FONT_THICK)
 
     cv.namedWindow("Results", cv.WINDOW_NORMAL)
     scale = tuple([round(x * WINDOW_SCALE) for x in frame.shape[0:2]][::-1])
