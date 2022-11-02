@@ -12,7 +12,7 @@ WINDOW_SCALE = 1
 
 # PROCESSING PARAMETERS
 RESIZE_WIDTH = 500
-BLUR_KERNEL_SIZE = 21
+BLUR_KERNEL_SIZE = 5
 MORPH_KERNEL_SIZE = (1, 1)
 MORPH_PASSES = 1
 
@@ -41,10 +41,14 @@ def find_contour(img):
     contours, h = cv.findContours(img, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
     
     ellipses = []
-    for c in contours: 
-        approx = cv.approxPolyDP(c, 0.02 * cv.arcLength(c, True), False) # Closed contour boolean set to false as many holes are open; (cv.isContourConvex(approx)) and (area > 3) also removed
+    for c in contours:
+        clen = cv.arcLength(c, True)
+        approx = cv.approxPolyDP(c, 0.02 * clen, True) # Closed contour boolean set to false as many holes are open; (cv.isContourConvex(approx)) and (area > 3) also removed
+        
         if (len(approx) > 8):
-            ellipses.append(cv.fitEllipse(c))
+            e = cv.fitEllipse(c)
+            if (clen > 0.8 * ellipseCirc(e)):
+                ellipses.append(e)
     circles = sorted(ellipses, key = lambda rect: rect[1][0] * rect[1][1], reverse = True)
     return circles
 
@@ -59,7 +63,6 @@ def draw_contour(frame, contours):
     
 def filter_results(contours):
     maxdim = max(contours[0][1])
-    print(maxdim)
     (cx, cy) = contours[0][0]
     hbound = (cx - maxdim, cx + maxdim)
     vbound = (cy - maxdim, cy+ maxdim)
@@ -76,30 +79,34 @@ def crop(img, shapes): # This section needs fixing
     maxx = shapes[0]
     mask = np.ones((img.shape[0], img.shape[1]))
     cv.ellipse(mask, maxx, 1, thickness = -1)
-##    rect = cv.boundingRect(maxx)
+   # rect = cv.boundingRect(maxx)
     print(mask)
     (cx, cy) = maxx[1] # Unpacks 2-element tuple
     return
 
-
+def ellipseCirc(ellipse):
+    w, h = (i / 2 for i in ellipse[1])
+    k = ((h - w) ** 2) / ((h + w) ** 2)
+    p = np.pi * (h + w) * (1 + 3 * k / (10 + np.sqrt(4 - 3 * k)))
+    return p
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-i", "--image", type = str, required = True, help = "Image index")
-    args = vars(ap.parse_args())
+    args = vars(ap.parse_args()) # Convert from argparse.Namespace object to dictionary
     
     frame = cv.imread(os.path.join(SRCPATH, f"{args['image']}.jpg"))
 
     if frame is None:
         print("Unable to load picture")
         exit()
-
-    frame = cv.medianBlur(frame, BLUR_KERNEL_SIZE)
-    # frame = cv.GaussianBlur(frame, (BLUR_KERNEL_SIZE,) * 2, 0)
     
     frame = ip.resizeImg(frame, width = RESIZE_WIDTH)[0]
     print(frame.shape)
 
+
+    frame = cv.medianBlur(frame, BLUR_KERNEL_SIZE)
+    # frame = cv.GaussianBlur(frame, (BLUR_KERNEL_SIZE,) * 2, 0)
     original = frame.copy()
     
     frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
@@ -115,7 +122,7 @@ def main():
 
     contours = find_contour(frame)
     print(len(contours))
-    contours = filter_results(contours)
+    #contours = filter_results(contours)
     print(len(contours))
     img_cnt = draw_contour(frame, contours)
     # crop(img_cnt, contours)
