@@ -14,7 +14,7 @@ WINDOW_SCALE = 1
 
 # PROCESSING PARAMETERS
 RESIZE_WIDTH = 500
-BLUR_KERNEL_SIZE = 5
+BLUR_KERNEL_SIZE = 9
 MORPH_KERNEL_SIZE = (1, 1)
 MORPH_PASSES = 1
 
@@ -44,13 +44,13 @@ def find_contour(img):
     
     ellipses = []
     for c in contours:
-        clen = cv.arcLength(c, True)
-        approx = cv.approxPolyDP(c, 0.02 * clen, True) # Closed contour boolean set to false as many holes are open; (cv.isContourConvex(approx)) and (area > 3) also removed
+        clen = cv.arcLength(c, False)
+        approx = cv.approxPolyDP(c, 0.02 * clen, False) # Closed contour boolean set to false as many holes are open; (cv.isContourConvex(approx)) and (area > 3) also removed
         
         if (len(approx) > 8):
             e = cv.fitEllipse(c)
-            if (clen > 0.8 * ellipseCirc(e)):
-                ellipses.append(e)
+            #if (clen > 0.8 * ellipseCirc(e)):
+            ellipses.append(e)
     circles = sorted(ellipses, key = lambda rect: rect[1][0] * rect[1][1], reverse = True)
     return circles
 
@@ -82,7 +82,6 @@ def crop(img, shapes): # This section needs fixing
     mask = np.ones((img.shape[0], img.shape[1]))
     cv.ellipse(mask, maxx, 1, thickness = -1)
    # rect = cv.boundingRect(maxx)
-    print(mask)
     (cx, cy) = maxx[1] # Unpacks 2-element tuple
     return
 
@@ -92,20 +91,12 @@ def ellipseCirc(ellipse):
     p = np.pi * (h + w) * (1 + 3 * k / (10 + np.sqrt(4 - 3 * k)))
     return p
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-i", "--image", type = str, required = True, help = "Image index")
-    args = vars(ap.parse_args()) # Convert from argparse.Namespace object to dictionary
-    
-    frame = cv.imread(os.path.join(SRCPATH, f"{args['image']}.jpg"))
-
+def process(frame):
     if frame is None:
         print("Unable to load picture")
         exit()
     
     frame = ip.resizeImg(frame, width = RESIZE_WIDTH)[0]
-    print(frame.shape)
-
 
     frame = cv.medianBlur(frame, BLUR_KERNEL_SIZE)
     # frame = cv.GaussianBlur(frame, (BLUR_KERNEL_SIZE,) * 2, 0)
@@ -123,9 +114,7 @@ def main():
     # frame = cv.morphologyEx(frame, cv.MORPH_OPEN, ker, MORPH_PASSES)
 
     contours = find_contour(frame)
-    print(len(contours))
     #contours = filter_results(contours)
-    print(len(contours))
     img_cnt = draw_contour(frame, contours)
     # crop(img_cnt, contours)
     
@@ -141,10 +130,21 @@ def main():
     cv.resizeWindow("Results", scale)
     cv.imshow("Results", frame)
     
-    if cv.waitKey(0) == ord('s'):
+    k = cv.waitKey(1)
+    if k == ord('q'):
+        return -1
+    elif k == ord('s'):
         t = time.strftime("%Y%m%d-%H%M%S")
         cv.imwrite(os.path.join(OUTPATH, f"test_{t}.png"), frame)
 
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-i", "--image", type = str, required = True, help = "Image index")
+    args = vars(ap.parse_args()) # Convert from argparse.Namespace object to dictionary
+    
+    frame = cv.imread(os.path.join(SRCPATH, f"{args['image']}.jpg"))
+    process(frame)
     cv.destroyAllWindows()
 
 if __name__ == "__main__":

@@ -1,25 +1,33 @@
+import argparse
+import os
+
 import cv2 as cv
-import numpy as np
-import matplotlib as plt
 
-cap = cv.VideoCapture(0)
+import pic
 
-if not cap.isOpened(): # Only applicable if using VideoCapture();
-    print("Unable to connect to camera")
-    exit()
+# GENERAL PARAMETERS
+SRCPATH = "flanges"
 
-while True:
-    ret, frame = cap.read()
-
-    if not ret:
-        print("Frame not read")
-        break
-
-    disp = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-i", "--index", type = str, required = True, help = "Video index")
+    args = vars(ap.parse_args()) # Convert from argparse.Namespace object to dictionary
+    vidpath = os.path.join(SRCPATH, f"{args['index']}.mov")
     
-    cv.imshow("View", disp)
-    if cv.waitKey(1) == ord('q'):
-        break
+    cap = cv.VideoCapture(vidpath)
+    
+    if not cap.isOpened():
+        print("Unable to connect to camera")
+        exit()
 
-cap.release()
-cv.destroyAllWindows()
+    ret, frame = cap.read()
+    while ret is not None:
+        if pic.process(frame) == -1:
+            break
+        ret, frame = cap.read()
+
+    cv.destroyAllWindows()
+    cap.release()
+
+if __name__ == "__main__":
+    main()
