@@ -1,9 +1,11 @@
+import argparse
+import os
+import time
+
 import cv2 as cv
 import numpy as np
+
 import imgprocess as ip
-import time
-import os
-import argparse
 
 # GENERAL PARAMETERS
 SRCPATH = "flanges"
