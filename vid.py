@@ -7,6 +7,7 @@ import pic
 
 # GENERAL PARAMETERS
 SRCPATH = "flanges"
+FPS_OUT = 60
 
 def main():
     ap = argparse.ArgumentParser()
@@ -21,13 +22,26 @@ def main():
         exit()
 
     ret, frame = cap.read()
-    while ret is not None:
-        if pic.process(frame) == -1:
+    while ret:
+        result = pic.process(frame)
+        if pic.show(result, True) == -1:
             break
         ret, frame = cap.read()
 
     cv.destroyAllWindows()
     cap.release()
+
+
+
+def save():
+# choose codec according to format needed
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
+    video = cv2.VideoWriter('video.avi', fourcc, OUT_FPS, (width, height), True)
+
+    for j in range(0,5):
+        img = cv2.imread(str(i) + '.png')
+        video.write(img)
+    video.release()
 
 if __name__ == "__main__":
     main()

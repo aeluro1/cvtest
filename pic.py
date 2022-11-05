@@ -11,10 +11,12 @@ import imgprocess as ip
 SRCPATH = "flanges"
 OUTPATH = "temp"
 WINDOW_SCALE = 1
+CONTOUR_FIT_MIN = 50        # Minimum ellipse confidence %
+CONTOUR_FIT_MAX = 150
 
-# PROCESSING PARAMETERS
+# PROCESSING PARAMETERS - TUNE FOR DIFFERENT CAMERA
 RESIZE_WIDTH = 500
-BLUR_KERNEL_SIZE = 9
+BLUR_KERNEL_SIZE = 5
 MORPH_KERNEL_SIZE = (1, 1)
 MORPH_PASSES = 1
 
@@ -46,11 +48,13 @@ def find_contour(img):
     for c in contours:
         clen = cv.arcLength(c, False)
         approx = cv.approxPolyDP(c, 0.02 * clen, False) # Closed contour boolean set to false as many holes are open; (cv.isContourConvex(approx)) and (area > 3) also removed
-        
         if (len(approx) > 8):
             e = cv.fitEllipse(c)
-            #if (clen > 0.8 * ellipseCirc(e)):
-            ellipses.append(e)
+            diff = clen / ip.ellipseCirc(e) * 100
+            print(diff)
+            if (CONTOUR_FIT_MIN < diff < CONTOUR_FIT_MAX):
+                ellipses.append(e)
+            # ellipses.append(e)
     circles = sorted(ellipses, key = lambda rect: rect[1][0] * rect[1][1], reverse = True)
     return circles
 
@@ -75,21 +79,7 @@ def filter_results(contours):
             contours.remove(cnt)
     return contours
 
-def crop(img, shapes): # This section needs fixing
-    if shapes is None:
-        return
-    maxx = shapes[0]
-    mask = np.ones((img.shape[0], img.shape[1]))
-    cv.ellipse(mask, maxx, 1, thickness = -1)
-   # rect = cv.boundingRect(maxx)
-    (cx, cy) = maxx[1] # Unpacks 2-element tuple
-    return
 
-def ellipseCirc(ellipse):
-    w, h = (i / 2 for i in ellipse[1])
-    k = ((h - w) ** 2) / ((h + w) ** 2)
-    p = np.pi * (h + w) * (1 + 3 * k / (10 + np.sqrt(4 - 3 * k)))
-    return p
 
 def process(frame):
     if frame is None:
@@ -119,23 +109,34 @@ def process(frame):
     # crop(img_cnt, contours)
     
     frame = cv.hconcat((original, img_processed, img_cnt))
+    
+    return frame
 
+def show(frame, vid = False):
     labels = ("Original", "Processed", "Contoured")
     for (i, txt) in enumerate(labels):
         sz = cv.getTextSize(txt, cv.FONT_HERSHEY_SIMPLEX, FONT_SCALE, thickness = FONT_THICK)
-        cv.putText(frame, txt, (original.shape[1] * i, original.shape[0] - sz[1]), cv.FONT_HERSHEY_SIMPLEX, FONT_SCALE, (0, 255, 0), FONT_THICK)
-
+        (x, y) = int(frame.shape[1] / 3 * i), frame.shape[0] - sz[1]
+        cv.putText(frame, txt, (x, y), cv.FONT_HERSHEY_SIMPLEX, FONT_SCALE, (0, 255, 0), FONT_THICK)
+    
     cv.namedWindow("Results", cv.WINDOW_NORMAL)
     scale = tuple([round(x * WINDOW_SCALE) for x in frame.shape[0:2]][::-1])
     cv.resizeWindow("Results", scale)
     cv.imshow("Results", frame)
     
-    k = cv.waitKey(1)
-    if k == ord('q'):
-        return -1
-    elif k == ord('s'):
-        t = time.strftime("%Y%m%d-%H%M%S")
-        cv.imwrite(os.path.join(OUTPATH, f"test_{t}.png"), frame)
+    if vid:
+        k = cv.waitKey(1)
+        if k == ord('s'):
+            pass
+        elif k != -1:
+            return -1
+    else:
+        k = cv.waitKey(0)
+        if k == ord('s'):
+            t = time.strftime("%Y%m%d-%H%M%S")
+            cv.imwrite(os.path.join(OUTPATH, f"test_{t}.png"), frame)
+    return 0
+    
 
 
 def main():
@@ -144,7 +145,8 @@ def main():
     args = vars(ap.parse_args()) # Convert from argparse.Namespace object to dictionary
     
     frame = cv.imread(os.path.join(SRCPATH, f"{args['image']}.jpg"))
-    process(frame)
+    frame = process(frame)
+    show(frame)
     cv.destroyAllWindows()
 
 if __name__ == "__main__":
